@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import Map from 'react-map-gl/mapbox';
+import Map from 'react-map-gl/maplibre';
 import { MapPin, Check, X, Navigation } from 'lucide-react';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import 'maplibre-gl/dist/maplibre-gl.css';
 
-import { MAPBOX_TOKEN, MAP_STYLE } from '../App';
+import { MAP_STYLE } from '../App';
 
 export function MapPicker({ initialCoords, onConfirm, onCancel }) {
   const [viewState, setViewState] = useState({
@@ -62,7 +62,6 @@ export function MapPicker({ initialCoords, onConfirm, onCancel }) {
           {...viewState}
           onMove={evt => setViewState(evt.viewState)}
           mapStyle={MAP_STYLE}
-          mapboxAccessToken={MAPBOX_TOKEN}
           attributionControl={false}
         />
         

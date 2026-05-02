@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Map, { Marker } from 'react-map-gl/mapbox';
+import Map, { Marker } from 'react-map-gl/maplibre';
 import { AddRecordModal } from './components/AddRecordModal';
 import { RecordDetailModal } from './components/RecordDetailModal';
 import { CalendarModal } from './components/CalendarModal';
 import { Plus, Mountain, LayoutList, Maximize, Minimize, Calendar } from 'lucide-react';
 import { db } from './utils/db';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import 'maplibre-gl/dist/maplibre-gl.css';
 
 export const MAP_STYLE = {
   version: 8,
@@ -78,7 +78,6 @@ export default function App() {
           {...viewState}
           onMove={evt => setViewState(evt.viewState)}
           mapStyle={MAP_STYLE}
-          mapboxAccessToken={MAPBOX_TOKEN}
           attributionControl={false}
         >
           {records.map((record) => (
