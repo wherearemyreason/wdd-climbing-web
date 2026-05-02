@@ -7,7 +7,27 @@ import { Plus, Mountain, LayoutList, Maximize, Minimize, Calendar } from 'lucide
 import { db } from './utils/db';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-export const MAP_STYLE = 'mapbox://styles/mapbox/outdoors-v12';
+export const MAP_STYLE = {
+  version: 8,
+  sources: {
+    'gaode-raster-tiles': {
+      type: 'raster',
+      tiles: [
+        'https://wprd01.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=7'
+      ],
+      tileSize: 256
+    }
+  },
+  layers: [
+    {
+      id: 'gaode-base-layer',
+      type: 'raster',
+      source: 'gaode-raster-tiles',
+      minzoom: 0,
+      maxzoom: 22
+    }
+  ]
+};
 export const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
 export default function App() {
