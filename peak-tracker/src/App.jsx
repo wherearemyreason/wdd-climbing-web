@@ -1,34 +1,53 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Map, { Marker } from 'react-map-gl/maplibre';
+import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import { AddRecordModal } from './components/AddRecordModal';
 import { RecordDetailModal } from './components/RecordDetailModal';
 import { CalendarModal } from './components/CalendarModal';
 import { Plus, Mountain, LayoutList, Maximize, Minimize, Calendar } from 'lucide-react';
 import { db } from './utils/db';
-import 'maplibre-gl/dist/maplibre-gl.css';
+import 'leaflet/dist/leaflet.css';
 
-export const MAP_STYLE = {
-  version: 8,
-  sources: {
-    'gaode-raster-tiles': {
-      type: 'raster',
-      tiles: [
-        'https://wprd01.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=7'
-      ],
-      tileSize: 256
+// 高德地图瓦片（国内直连，无需翻墙）
+const GAODE_TILE_URL = 'https://wprd01.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=7';
+
+// 用于动态更新地图中心和缩放的辅助组件
+function MapController({ center, zoom }) {
+  const map = useMap();
+  useEffect(() => {
+    if (center) {
+      map.setView(center, zoom, { animate: true });
     }
-  },
-  layers: [
-    {
-      id: 'gaode-base-layer',
-      type: 'raster',
-      source: 'gaode-raster-tiles',
-      minzoom: 0,
-      maxzoom: 22
-    }
-  ]
-};
-export const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
+  }, [center, zoom, map]);
+  return null;
+}
+
+// 用于全屏时强制刷新地图尺寸的辅助组件
+function MapResizer({ trigger }) {
+  const map = useMap();
+  useEffect(() => {
+    setTimeout(() => map.invalidateSize(), 100);
+    setTimeout(() => map.invalidateSize(), 400);
+  }, [trigger, map]);
+  return null;
+}
+
+// 创建自定义勋章 Marker 图标
+function createMedalIcon(medalSrc) {
+  return L.divIcon({
+    className: 'custom-medal-marker',
+    html: `
+      <div style="position:relative; cursor:pointer;">
+        <div style="position:absolute; bottom:-5px; left:50%; transform:translateX(-50%) rotate(45deg); width:14px; height:14px; background:white; border-radius:2px; box-shadow:0 2px 6px rgba(0,0,0,0.15);"></div>
+        <div style="width:52px; height:52px; border-radius:50%; border:3px solid white; box-shadow:0 4px 12px rgba(0,0,0,0.2); overflow:hidden; position:relative; z-index:1; background:#f9fafb;">
+          <img src="${medalSrc}" style="width:100%; height:100%; object-fit:cover;" />
+        </div>
+      </div>
+    `,
+    iconSize: [52, 62],
+    iconAnchor: [26, 62],
+  });
+}
 
 export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -36,20 +55,9 @@ export default function App() {
   const [records, setRecords] = useState([]);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
-  const mapRef = useRef();
-
-  useEffect(() => {
-    if (mapRef.current) {
-      setTimeout(() => mapRef.current.resize(), 50);
-      setTimeout(() => mapRef.current.resize(), 300);
-    }
-  }, [isMapFullscreen]);
   
-  const [viewState, setViewState] = useState({
-    longitude: 104.0665,
-    latitude: 30.5723,
-    zoom: 6
-  });
+  const [mapCenter, setMapCenter] = useState([30.5723, 104.0665]); // [lat, lng] for Leaflet
+  const [mapZoom, setMapZoom] = useState(6);
 
   const loadRecords = async () => {
     const data = await db.getAllRecords();
@@ -57,12 +65,8 @@ export default function App() {
     setRecords(sortedData);
     
     if (sortedData.length > 0) {
-      setViewState(prev => ({
-        ...prev,
-        longitude: sortedData[0].coordinates[0],
-        latitude: sortedData[0].coordinates[1],
-        zoom: 8
-      }));
+      setMapCenter([sortedData[0].coordinates[1], sortedData[0].coordinates[0]]);
+      setMapZoom(8);
     }
   };
 
@@ -73,38 +77,35 @@ export default function App() {
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[#f8fafc] font-sans overflow-hidden">
       <div className={`${isMapFullscreen ? 'fixed inset-0 z-40' : 'relative h-[45vh] w-full z-10'} shadow-inner bg-gray-200`}>
-        <Map
-          ref={mapRef}
-          {...viewState}
-          onMove={evt => setViewState(evt.viewState)}
-          mapStyle={MAP_STYLE}
+        <MapContainer 
+          center={mapCenter} 
+          zoom={mapZoom} 
+          style={{ width: '100%', height: '100%' }}
+          zoomControl={false}
           attributionControl={false}
         >
+          <TileLayer url={GAODE_TILE_URL} maxZoom={18} />
+          <MapController center={mapCenter} zoom={mapZoom} />
+          <MapResizer trigger={isMapFullscreen} />
+          
           {records.map((record) => (
             <Marker 
-              key={record.id} 
-              longitude={record.coordinates[0]} 
-              latitude={record.coordinates[1]} 
-              anchor="bottom" 
-              onClick={(e) => {
-                e.originalEvent.stopPropagation();
-                setSelectedRecord(record);
-                if (isMapFullscreen) setIsMapFullscreen(false);
+              key={record.id}
+              position={[record.coordinates[1], record.coordinates[0]]}
+              icon={createMedalIcon(record.medalIcon)}
+              eventHandlers={{
+                click: () => {
+                  setSelectedRecord(record);
+                  if (isMapFullscreen) setIsMapFullscreen(false);
+                }
               }}
-            >
-              <div className="relative group cursor-pointer active:scale-95 transition-transform duration-300">
-                <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-4 bg-white rotate-45 rounded-sm shadow-md"></div>
-                <div className="w-14 h-14 rounded-full border-[3px] border-white shadow-lg overflow-hidden relative z-10 bg-gray-50">
-                  <img src={record.medalIcon} className="w-full h-full object-cover" alt="勋章" />
-                </div>
-              </div>
-            </Marker>
+            />
           ))}
-        </Map>
+        </MapContainer>
         
         <button 
           onClick={() => setIsMapFullscreen(!isMapFullscreen)}
-          className="absolute top-6 right-4 bg-white/90 backdrop-blur-md p-2.5 rounded-2xl shadow-lg text-gray-700 active:scale-90 transition-all z-50"
+          className="absolute top-6 right-4 bg-white/90 backdrop-blur-md p-2.5 rounded-2xl shadow-lg text-gray-700 active:scale-90 transition-all z-[1000]"
         >
           {isMapFullscreen ? <Minimize size={20} strokeWidth={2.5} /> : <Maximize size={20} strokeWidth={2.5} />}
         </button>

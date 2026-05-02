@@ -1,28 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, MapPin, Compass } from 'lucide-react';
 import { MedalUploader, PhotosUploader } from './ImageUploader';
 import { MapPicker } from './MapPicker';
 import { db } from '../utils/db';
 import exifr from 'exifr';
 
+const INITIAL_FORM = {
+  title: '',
+  date: new Date().toISOString().split('T')[0],
+  elevation: '',
+  notes: '',
+  coordinates: null,
+  medalIcon: '',
+  photos: []
+};
+
 export function AddRecordModal({ isOpen, onClose, onAdded }) {
   const [isPickingMap, setIsPickingMap] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [extractMsg, setExtractMsg] = useState("");
-  
-  const [formData, setFormData] = useState({
-    title: '',
-    date: new Date().toISOString().split('T')[0],
-    elevation: '',
-    notes: '',
-    coordinates: null,
-    medalIcon: '',
-    photos: []
-  });
+  const [formData, setFormData] = useState({...INITIAL_FORM});
+
+  // 每次打开弹窗时重置表单
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        ...INITIAL_FORM,
+        date: new Date().toISOString().split('T')[0]
+      });
+      setExtractMsg("");
+      setIsPickingMap(false);
+      setIsSubmitting(false);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  // 从照片中提取 GPS EXIF 数据
+  // 从照片中提取 GPS EXIF 数据（每次上传新照片都会尝试提取）
   const extractGpsFromFiles = async (files) => {
     for (const file of files) {
       try {
@@ -96,7 +110,8 @@ export function AddRecordModal({ isOpen, onClose, onAdded }) {
               value={formData.medalIcon} 
               onChange={async (val, file) => {
                 setFormData(prev => ({...prev, medalIcon: val}));
-                if (file && !formData.coordinates) {
+                // 每次上传勋章照片都尝试提取坐标
+                if (file) {
                   await extractGpsFromFiles([file]);
                 }
               }} 
@@ -178,7 +193,8 @@ export function AddRecordModal({ isOpen, onClose, onAdded }) {
               photos={formData.photos}
               onChange={async (val, files) => {
                 setFormData(prev => ({...prev, photos: val}));
-                if (files && files.length > 0 && !formData.coordinates) {
+                // 每次上传新照片都尝试提取坐标
+                if (files && files.length > 0) {
                   await extractGpsFromFiles(files);
                 }
               }} 
